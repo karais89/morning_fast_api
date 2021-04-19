@@ -21,3 +21,8 @@ python -m venv venv
 - Python Test Explorer for Visual Studio Code
 
 ### FastAPI 설정
+
+```bash
+pip install fastapi
+pip install uvicorn[standard]
+```
