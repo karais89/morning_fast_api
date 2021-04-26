@@ -1,5 +1,8 @@
+from typing import Set
 from fastapi import FastAPI
 from enum import Enum
+# from config import dev
+from . import config
 
 app = FastAPI()
 
@@ -12,6 +15,15 @@ class ModelName(str, Enum):
 async def root():
     return {"message": "Hello World"}
 
+
+@app.get("/info")
+async def info():
+    return {
+        "app_name": config.settings.app_name,
+        # "admin_email": dev.settings.admin_email,
+        "items_per_user": config.settings.items_per_user,
+    }
+    
 @app.get("/items/{item_id}")
 async def read_item(item_id: int):
     return {"item_id": item_id}
