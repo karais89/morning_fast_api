@@ -2,7 +2,11 @@ from typing import Set
 from fastapi import FastAPI
 from enum import Enum
 # from config import dev
-from . import config
+# from sql_app.config import config
+# import configs.config
+# from utils import util
+from configs import config
+
 
 app = FastAPI()
 
