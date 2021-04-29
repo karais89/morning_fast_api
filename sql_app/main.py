@@ -1,22 +1,8 @@
-from functools import lru_cache
+from fastapi import FastAPI
+from database import engine
+from models import model
 
-from fastapi import Depends, FastAPI
-
-from configs import config
+model.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
-
-@lru_cache()
-def get_settings():
-    return config.Settings()
-
-
-@app.get("/info")
-async def info(settings: config.Settings = Depends(get_settings)):
-    return {
-        "app_env": settings.app_env,
-        "app_name": settings.app_name,
-        "admin_email": settings.admin_email,
-        "items_per_user": settings.items_per_user,
-    }
