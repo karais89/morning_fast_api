@@ -367,6 +367,33 @@ name: str
 
 염두에 두십시오. 따라서 = 및 :를 사용할 때 혼동하지 마십시오.
 
+
+### 읽기 / 반환을위한 Pydantic 모델 / 스키마 생성
+
+이제 데이터를 읽을 때 사용할 때까지 사용될 Pydantic 모델(스키마)을 API에서 리턴 할 때 사용할 수 있습니다.
+
+예를 들어, 항목을 만들기 전에 해당 항목에 할당된 ID가 무엇인지 알 수 없지만, 항목을 읽을 때(API에서 반환할 때) 해당 ID를 이미 알고 있습니다.
+
+동일한 방법으로 사용자를 읽을 때 이제 항목에 이 사용자의 항목이 포함됨을 선언할 수 있습니다.
+
+이러한 항목의 ID뿐만 아니라 항목을 읽기 위해 Pydantic 모델에서 정의한 모든 데이터도 다음과 같습니다. `Item`.
+
+```py
+class Item(ItemBase):
+    id: int
+    owner_id: int
+
+class User(UserBase):
+    id: int
+    is_active: bool
+    items: List[Item] = []
+```
+
+팁
+```
+사용자를 읽을 때 (API에서 반환) 사용되는 Pydantic 모델 User에는 암호가 포함되어 있지 않습니다.
+```
+
 ### 전체 코드
 ```py
 from typing import List, Optional
