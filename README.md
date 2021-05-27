@@ -178,3 +178,62 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 ```py
 Base = declarative_base()
 ```
+
+## 데이터베이스 모델 만들기
+
+이제 `sql_app/models.py` 파일을 보겠습니다.
+
+### Base 클래스에서 SQLAlchemy 모델 만들기
+
+SQLAlchemy 모델을 만들기 위해 이전에 만든 이 Base 클래스를 사용합니다.
+
+팁
+```
+SQLAlchemy는 "모델"이라는 용어를 사용하여 데이터베이스와 상호 작용하는 이러한 클래스 및 인스턴스를 나타냅니다.
+
+그러나 Pydantic은 "모델"이라는 용어를 사용하여 데이터 유효성 검사, 변환, 문서 클래스 및 인스턴스와 같은 다른 것을 나타냅니다.
+```
+
+`database`에서 `Base`를 가져옵니다 (위에서 `database.py` 파일).
+
+상속되는 클래스를 만듭니다.
+
+이러한 클래스는 SQLAlchemy 모델입니다.
+
+```py
+from .database import Base
+
+class User(Base):
+    __tablename__ = "users"
+
+class Item(Base):
+    __tablename__ = "items"
+```
+
+`__tablename__` 속성은 SQLAlchemy에게 이러한 각 모델에 대해 데이터베이스에서 사용할 테이블의 이름을 알려줍니다.
+
+### 모델 속성/열 만들기
+
+이제 모든 모델 (클래스) 속성을 만듭니다.
+
+이러한 각 속성은 해당 데이터베이스 테이블의 열을 나타냅니다.
+
+SQLAlchemy의 `Column`을 기본값으로 사용합니다.
+
+그리고 SQLAlchemy 클래스 "type"을 `Integer`, `String` 및 `Boolean`으로 전달합니다. 이 클래스는 데이터베이스의 유형을 인수로 정의합니다.
+
+```py
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+
+class User(Base):
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String, unique=True, index=True)
+    hashed_password = Column(String)
+    is_active = Column(Boolean, default=True)
+
+class Item(Base):
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, index=True)
+    description = Column(String, index=True)
+    owner_id = Column(Integer, ForeignKey("users.id"))
+```
