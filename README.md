@@ -315,7 +315,7 @@ class Item(Base):
 
 팁
 ```
-SQLAlchemy 모델과 Pydantic 모델 간의 혼란을 피하기 위해 SqlAlchemy 모델을 사용하여 파일 모델과 Pydantic 모델과 함께 schemas.py 파일을 갖게됩니다.
+SQLAlchemy 모델과 Pydantic 모델 간의 혼란을 피하기 위해 SqlAlchemy 모델을 사용하여 models.py과 Pydantic 모델과 함께 schemas.py 파일을 갖게됩니다.
 
 이 일부 Pydantic 모델은 "schema"(유효한 데이터 모양)를 더 많거나 적게 정의합니다.
 
