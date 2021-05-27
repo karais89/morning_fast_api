@@ -308,3 +308,61 @@ class Item(Base):
 
     owner = relationship("User", back_populates="items")
 ```
+
+## Pydantic 모델 생성
+
+이제 `sql_app/schemas.py` 파일을 확인해 봅시다.
+
+팁
+```
+SQLAlchemy 모델과 Pydantic 모델 간의 혼란을 피하기 위해 SqlAlchemy 모델을 사용하여 파일 모델과 Pydantic 모델과 함께 schemas.py 파일을 갖게됩니다.
+
+이 일부 Pydantic 모델은 "schema"(유효한 데이터 모양)를 더 많거나 적게 정의합니다.
+
+그래서 이것은 둘 다 사용하는 동안 혼란을 피하고 도움이 될 것입니다.
+```
+
+### Pydantic 모델/스키마 만들기
+
+`ItemBase` 및 `UserBase` Pydantic 모델을 만들거나 데이터를 생성하거나 읽는 동안 일반적인 속성을 갖도록 "스키마"라고 말합니다.
+
+또한 동일한 속성을 가지도록 상속하는 `ItemCreate` 및 `UserCreate`를 생성하고 생성에 필요한 추가 데이터(속성)를 생성합니다.
+
+따라서 사용자는 또한 만들 때 비밀번호를 가질 것입니다. 
+
+그러나 보안을 위해 비밀번호는 다른 일부 Pydantic 모델에 있지 않습니다. 예를 들어 사용자를 읽을 때 API에서 전송되지 않습니다.
+
+```py
+from pydantic import BaseModel
+
+
+class ItemBase(BaseModel):
+    title: str
+    description: Optional[str] = None
+
+
+class ItemCreate(ItemBase):
+    pass
+
+
+class UserBase(BaseModel):
+    email: str
+
+
+class UserCreate(UserBase):
+    password: str
+```
+
+#### SQLAlchemy 스타일과 Pydantic 스타일
+
+SQLAlchemy 모델은 = 를 사용하여 속성을 정의하고 유형을 다음과 같이 `Column`에 매개 변수로 전달합니다.
+```py
+name = Column(String)
+```
+
+Pydantic 모델은 :를 사용하여 유형을 선언하지만 새로운 유형 주석 구문 / 유형 힌트 :
+```py
+name: str
+```
+
+염두에 두십시오. 따라서 = 및 :를 사용할 때 혼동하지 마십시오.
