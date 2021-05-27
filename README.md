@@ -256,6 +256,30 @@ class Item(Base):
     owner_id = Column(Integer, ForeignKey("users.id"))
 ```
 
+### 관계 만들기
+
+이제 관계를 만듭니다.
+
+이를 위해 SQLAlchemy ORM에서 제공하는 `relationship`를 사용합니다.
+
+이것은 이 테이블과 관련된 다른 테이블의 값을 포함하는 "마법" 속성이 될 것입니다.
+
+```py
+from sqlalchemy.orm import relationship
+
+class User(Base):
+    items = relationship("Item", back_populates="owner")
+
+class Item(Base):
+    owner = relationship("User", back_populates="items")
+```
+
+사용자의 속성 항목에 my_user.items와 같이 액세스 할 때 사용자 테이블 에서 이 레코드를 가리키는 외래 키가 있는 항목의 SQLAlchemy 모델 (항목 테이블에서) 목록이 있습니다.
+
+my_user.items에 액세스하면 SQLAlchemy가 실제로 항목 테이블의 데이터베이스에서 항목을 가져 와서 여기에서 채우십시오.
+
+그리고 항목의 속성 소유자에 액세스 할 때 사용자 테이블의 사용자 SQLAlchemy 모델이 포함됩니다. Owner_ID 속성 / 열을 외래 키로 사용하여 사용자 테이블에서 얻을 수있는 레코드를 알 수 있습니다.
+
 ### 전체 코드
 ```py
 from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
