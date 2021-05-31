@@ -394,6 +394,73 @@ class User(UserBase):
 사용자를 읽을 때 (API에서 반환) 사용되는 Pydantic 모델 User에는 암호가 포함되어 있지 않습니다.
 ```
 
+### Pydantic의 orm_mode 사용
+
+이제 읽기를 위한 Pydantic 모델, Item 및 User에서 내부 Config 클래스를 추가합니다.
+
+이 Config 클래스는 Pydantic에 구성을 제공하는 데 사용됩니다.
+
+Config 클래스에서 orm_mode = True 속성을 설정합니다.
+
+```py
+class Item(ItemBase):
+    class Config:
+        orm_mode = True
+
+class User(UserBase):
+    class Config:
+        orm_mode = True
+```
+
+팁
+```
+아래와 같이 =로 값을 할당하고 있습니다.
+
+orm_mode = True
+
+:를 사용하지 않습니다 이전의 유형 선언과 마찬가지로.
+
+이것은 유형을 선언하는 것이 아니라 구성 값을 설정하는 것입니다.
+```
+
+Pydantic의 orm_mode는 Pydantic 모델이 딕셔너리가 아니라 ORM 모델 (또는 속성이있는 다른 임의의 개체)이더라도 데이터를 읽도록 지시합니다.
+
+이렇게하면 다음과 같이 `dict`에서 id 값을 가져 오는 대신
+
+```py
+id = data["id"]
+```
+
+또한 다음과 같이 속성에서 가져 오려고 시도합니다.
+
+```py
+id = data.id
+```
+
+이를 통해 Pydantic 모델은 ORM과 호환되며 경로 작업의 response_model 인수에서 선언 할 수 있습니다.
+
+데이터베이스 모델을 반환 할 수 있으며 여기에서 데이터를 읽습니다.
+
+#### ORM 모드에 대한 기술적 세부 사항
+
+SQLAlchemy 및 기타 많은 기능은 기본적으로 "지연 로딩"입니다.
+
+예를 들어 해당 데이터를 포함 할 속성에 액세스하지 않는 한 데이터베이스에서 관계에 대한 데이터를 가져 오지 않는다는 의미입니다.
+
+예를 들어, 속성 항목에 액세스
+
+```py
+current_user.items
+```
+
+SQLAlchemy가 항목 테이블로 이동하여 이 사용자에 대한 항목을 가져 오지만 이전에는 가져 오지 않습니다.
+
+`orm_mode`가 없으면 경로 작업에서 SQLAlchemy 모델을 반환하면 관계 데이터가 포함되지 않습니다.
+
+Pydantic 모델에서 이러한 관계를 선언 한 경우에도 마찬가지입니다.
+
+그러나 ORM 모드를 사용하면 Pydantic 자체가 속성 (딕셔너리를 가정하는 대신)에서 필요한 데이터에 액세스하려고 시도하므로 반환하려는 특정 데이터를 선언 할 수 있으며 ORM에서도 가져 와서 가져올 수 있습니다.
+
 ### 전체 코드
 ```py
 from typing import List, Optional
