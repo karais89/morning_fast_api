@@ -501,3 +501,156 @@ class User(UserBase):
     class Config:
         orm_mode = True
 ```
+
+## CRUD 유틸
+
+이제 `sql_app/crud.py` 파일을 보겠습니다.
+
+이 파일에는 데이터베이스의 데이터와 상호 작용하는 재사용 가능한 함수가 있습니다.
+
+CRUD는 생성, 읽기, 업데이트 및 삭제에서 제공됩니다.
+
+...이 예에서 우리는 단지 만들고 읽고 있습니다.
+
+### 데이터 읽기
+
+`sqlalchemy.orm`에서 `Session`을 가져 오면 db 매개 변수의 유형을 선언하고 함수에서 더 나은 유형 검사 및 완성 기능을 사용할 수 있습니다.
+
+`model` (SQLAlchemy 모델) 및 `schemas` (Pydantic 모델/스키마)를 가져옵니다.
+
+다음을위한 유틸리티 함수 생성 :
+
+- ID와 이메일로 단일 사용자를 읽습니다.
+- 여러 사용자를 읽습니다.
+- 여러 항목을 읽습니다.
+
+```py
+from sqlalchemy.orm import Session
+from . import models, schemas
+
+
+def get_user(db: Session, user_id: int):
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
+
+def get_user_by_email(db: Session, email: str):
+    return db.query(models.User).filter(models.User.email == email).first()
+
+
+def get_users(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.User).offset(skip).limit(limit).all()
+
+
+def get_items(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Item).offset(skip).limit(limit).all()
+```
+
+팁
+```
+경로 작업 기능과는 별도로 데이터베이스와 상호 작용(사용자 또는 항목 가져 오기) 전용 기능을 만들면 여러 부분에서 더 쉽게 재사용하고 단위 테스트를 추가 할 수 있습니다.
+```
+
+### 데이터 생성
+
+이제 데이터를 만드는 유틸리티 함수를 만듭니다.
+
+단계는 다음과 같습니다.
+
+- 데이터로 SQLAlchemy 모델 인스턴스를 만듭니다.
+- `add` 해당 인스턴스 개체를 데이터베이스 세션에 추가하십시오.
+- `commit` 변경 사항을 데이터베이스에 커밋하여 저장합니다.
+- `refresh` 인스턴스를 새로 고칩니다 (생성 된 ID와 같이 데이터베이스의 새 데이터를 포함하도록).
+
+```py
+def create_user(db: Session, user: schemas.UserCreate):
+    fake_hashed_password = user.password + "notreallyhashed"
+    db_user = models.User(email=user.email, hashed_password=fake_hashed_password)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+def create_user_item(db: Session, item: schemas.ItemCreate, user_id: int):
+    db_item = models.Item(**item.dict(), owner_id=user_id)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+```
+
+팁
+```
+User에 대한 SQLAlchemy 모델에는 암호의 보안 해시 버전을 포함해야하는 hashed_password가 포함되어 있습니다.
+
+그러나 API 클라이언트가 제공하는 것은 원래 비밀번호이므로 이를 추출하고 애플리케이션에서 해시 된 비밀번호를 생성해야합니다.
+
+그런 다음 저장할 값과 함께 hashed_password 인수를 전달합니다.
+```
+
+경고
+```
+이 예는 안전하지 않으며 암호는 해시되지 않습니다.
+
+실제 응용 프로그램에서는 암호를 해시하고 일반 텍스트로 저장하지 않아야합니다.
+
+자세한 내용은 자습서의 보안 섹션으로 돌아가십시오.
+
+여기서는 데이터베이스의 도구와 메커니즘에만 초점을 맞추고 있습니다.
+```
+
+팁
+```
+각 키워드 인수를 Item에 전달하고 Pydantic 모델에서 각각을 읽는 대신 다음을 사용하여 Pydantic 모델의 데이터를 사용하여 사전을 생성합니다.
+
+item.dict()
+
+그런 다음 dict의 키-값 쌍을 키워드 인수로 SQLAlchemy 항목에 다음과 함께 전달합니다.
+
+Item(**item.dict())
+
+그런 다음 Pydantic 모델에서 제공하지 않는 추가 키워드 인수 owner_id를 다음과 함께 전달합니다.
+
+Item(**item.dict(), owner_id=user_id)
+```
+
+
+### 전체 코드
+
+```py
+from sqlalchemy.orm import Session
+from . import models, schemas
+
+
+def get_user(db: Session, user_id: int):
+    return db.query(models.User).filter(models.User.id == user_id).first()
+
+
+def get_user_by_email(db: Session, email: str):
+    return db.query(models.User).filter(models.User.email == email).first()
+
+
+def get_users(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.User).offset(skip).limit(limit).all()
+
+
+def create_user(db: Session, user: schemas.UserCreate):
+    fake_hashed_password = user.password + "notreallyhashed"
+    db_user = models.User(email=user.email, hashed_password=fake_hashed_password)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+def get_items(db: Session, skip: int = 0, limit: int = 100):
+    return db.query(models.Item).offset(skip).limit(limit).all()
+
+
+def create_user_item(db: Session, item: schemas.ItemCreate, user_id: int):
+    db_item = models.Item(**item.dict(), owner_id=user_id)
+    db.add(db_item)
+    db.commit()
+    db.refresh(db_item)
+    return db_item
+```
