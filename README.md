@@ -654,3 +654,168 @@ def create_user_item(db: Session, item: schemas.ItemCreate, user_id: int):
     db.refresh(db_item)
     return db_item
 ```
+
+## Main FastAPI app
+
+이제 `sql_app/main.py` 파일에서 이전에 만든 다른 모든 부분을 통합하고 사용하겠습니다.
+
+### 데이터베이스 테이블 만들기
+
+매우 간단한 방법으로 데이터베이스 테이블을 만듭니다.
+
+```py
+models.Base.metadata.create_all(bind=engine)
+```
+
+#### Alembic 참고
+
+일반적으로 [Alembic](https://alembic.sqlalchemy.org/en/latest/)을 사용하여 데이터베이스를 초기화 (테이블 생성 등) 할 수 있습니다.
+
+또한 Alembic을 "마이그레이션"(주요 작업)에 사용합니다.
+
+"마이그레이션"은 SQLAlchemy 모델의 구조를 변경하고, 새 속성을 추가하는 등 데이터베이스에서 이러한 변경 사항을 복제하고, 새 열, 새 테이블을 추가하는 등의 작업을 수행 할 때마다 필요한 일련의 단계입니다.
+
+[프로젝트 생성-템플릿의 템플릿](https://fastapi.tiangolo.com/project-generation/)에서 FastAPI 프로젝트에서 Alembic의 예를 찾을 수 있습니다. [특히 소스 코드의 alembic 디렉토리에 있습니다.](https://github.com/tiangolo/full-stack-fastapi-postgresql/tree/master/%7B%7Bcookiecutter.project_slug%7D%7D/backend/app/alembic/)
+
+
+### 종속성 만들기
+
+정보
+```
+이 작업을 수행하려면 Python 3.7 이상을 사용하거나 Python 3.6에서 "backports"를 설치해야합니다.
+
+$ pip install async-exit-stack async-generator
+
+이렇게하면 async-exit-stack 및 async-generator가 설치됩니다.
+
+마지막에 설명 된 "middleware"와 함께 대체 방법을 사용할 수도 있습니다.
+```
+
+이제 `sql_app/databases.py` 파일에서 만든 `SessionLocal` 클래스를 사용하여 종속성을 만듭니다.
+
+요청마다 독립적 인 데이터베이스 세션/연결 (SessionLocal)이 필요하고 모든 요청에 동일한 세션을 사용한 다음 요청이 완료된 후 닫아야 합니다.
+
+그런 다음 다음 요청을 위해 새 세션이 생성됩니다.
+
+이를 위해 이전에 `yield`를 사용한 [종속성에 대한 섹션](https://fastapi.tiangolo.com/tutorial/dependencies/dependencies-with-yield/)에서 설명한대로 yield를 사용하여 새 종속성을 만듭니다.
+
+우리의 종속성은 단일 요청에 사용될 새 SQLAlchemy `SessionLocal`을 생성 한 다음 요청이 완료되면 닫습니다.
+
+```py
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+```
+
+정보
+```
+SessionLocal() 생성 및 요청 처리를 try 블록에 넣습니다.
+
+그리고 finally 블록에서 닫습니다.
+
+이렇게하면 요청 후에 데이터베이스 세션이 항상 닫힙니다. 요청을 처리하는 동안 예외가 발생하더라도.
+
+그러나 종료 코드에서 다른 예외를 발생시킬 수 없습니다 (yield 후). yield 및 HTTPException이있는 종속성에서 자세히보기
+```
+
+그런 다음 경로 연산 함수에서 종속성을 사용할 때 SQLAlchemy에서 직접 가져온 `Session` 유형으로 선언합니다.
+
+그러면 편집기가 `db` 매개 변수가 `Session` 유형임을 알 수 있기 때문에 경로 작업 함수 내에서 더 나은 편집기 지원을 제공합니다.
+
+```py
+@app.post("/users/", response_model=schemas.User)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    pass
+
+
+@app.get("/users/", response_model=List[schemas.User])
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    pass
+
+
+@app.get("/users/{user_id}", response_model=schemas.User)
+def read_user(user_id: int, db: Session = Depends(get_db)):
+    pass
+
+
+@app.post("/users/{user_id}/items/", response_model=schemas.Item)
+def create_item_for_user(user_id: int, item: schemas.ItemCreate, db: Session = Depends(get_db)):
+    pass
+
+
+@app.get("/items/", response_model=List[schemas.Item])
+def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    pass
+```
+
+Technical Details
+```
+db 매개 변수는 실제로 SessionLocal 유형이지만 이 클래스 (sessionmaker()로 생성됨)는 SQLAlchemy 세션의 "proxy"이므로 편집기는 제공되는 메소드를 실제로 알지 못합니다.
+
+그러나 유형을 Session으로 선언함으로써 편집기는 이제 사용 가능한 메서드 (.add(), .query(), .commit() 등)를 알 수 있고 더 나은 지원 (예 : 완료)을 제공 할 수 있습니다. 형식 선언은 실제 개체에 영향을 주지 않습니다.
+```
+
+
+### 전체 코드
+
+```py
+from typing import List
+
+from fastapi import Depends, FastAPI, HTTPException
+from sqlalchemy.orm import Session
+
+from . import crud, models, schemas
+from .database import SessionLocal, engine
+
+
+models.Base.metadata.create_all(bind=engine)
+
+app = FastAPI()
+
+# Dependency
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+@app.post("/users/", response_model=schemas.User)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_email(db, email=user.email)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    return crud.create_user(db=db, user=user)
+
+
+@app.get("/users/", response_model=List[schemas.User])
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    users = crud.get_users(db, skip=skip, limit=limit)
+    return users
+
+
+@app.get("/users/{user_id}", response_model=schemas.User)
+def read_user(user_id: int, db: Session = Depends(get_db)):
+    db_user = crud.get_user(db, user_id=user_id)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
+
+@app.post("/users/{user_id}/items/", response_model=schemas.Item)
+def create_item_for_user(
+    user_id: int, item: schemas.ItemCreate, db: Session = Depends(get_db)
+):
+    return crud.create_user_item(db=db, item=item, user_id=user_id)
+
+
+@app.get("/items/", response_model=List[schemas.Item])
+def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    items = crud.get_items(db, skip=skip, limit=limit)
+    return items
+```
