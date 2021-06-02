@@ -759,6 +759,102 @@ db 매개 변수는 실제로 SessionLocal 유형이지만 이 클래스 (sessio
 그러나 유형을 Session으로 선언함으로써 편집기는 이제 사용 가능한 메서드 (.add(), .query(), .commit() 등)를 알 수 있고 더 나은 지원 (예 : 완료)을 제공 할 수 있습니다. 형식 선언은 실제 개체에 영향을 주지 않습니다.
 ```
 
+### FastAPI 경로 작업 생성
+
+이제 마지막으로 표준 FastAPI 경로 작업 코드가 있습니다.
+
+```py
+@app.post("/users/", response_model=schemas.User)
+def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    db_user = crud.get_user_by_email(db, email=user.email)
+    if db_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    return crud.create_user(db=db, user=user)
+
+
+@app.get("/users/", response_model=List[schemas.User])
+def read_users(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    users = crud.get_users(db, skip=skip, limit=limit)
+    return users
+
+
+@app.get("/users/{user_id}", response_model=schemas.User)
+def read_user(user_id: int, db: Session = Depends(get_db)):
+    db_user = crud.get_user(db, user_id=user_id)
+    if db_user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    return db_user
+
+
+@app.post("/users/{user_id}/items/", response_model=schemas.Item)
+def create_item_for_user(
+    user_id: int, item: schemas.ItemCreate, db: Session = Depends(get_db)
+):
+    return crud.create_user_item(db=db, item=item, user_id=user_id)
+
+
+@app.get("/items/", response_model=List[schemas.Item])
+def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
+    items = crud.get_items(db, skip=skip, limit=limit)
+    return items
+```
+
+`yield`를 사용하여 종속성의 각 요청 전에 데이터베이스 세션을 생성 한 다음 나중에 닫습니다.
+
+그런 다음 경로 작업 함수에 필요한 종속성을 생성하여 해당 세션을 직접 가져올 수 있습니다.
+
+이를 통해 경로 작업 함수 내부에서 직접 `crud.get_user`를 호출하고 해당 세션을 사용할 수 있습니다.
+
+팁
+```
+반환하는 값은 SQLAlchemy 모델 또는 SQLAlchemy 모델 목록입니다.
+
+그러나 모든 경로 작업에는 orm_mode를 사용하는 Pydantic 모델/스키마가 포함 된 response_model이 있으므로 Pydantic 모델에서 선언 된 데이터는 모든 일반 필터링 및 유효성 검사와 함께 해당 모델에서 추출되어 클라이언트로 반환됩니다.
+```
+
+팁
+```
+또한 List [schemas.Item]과 같은 표준 Python 유형이있는 response_model이 있습니다.
+
+그러나 해당 목록의 내용/파라미터가 orm_mode가있는 pydantic 모델이므로 데이터는 문제없이 정상적으로 검색되어 클라이언트에 반환됩니다.
+```
+
+### def vs async def 정보
+
+여기서는 경로 연산 기능과 종속성 내부에서 SQL Alchemy 코드를 사용하고 있으며 차례로 외부 데이터베이스와 통신합니다.
+
+잠재적으로 "대기"가 필요할 수 있습니다.
+
+그러나 SQLAlchemy는 다음과 같이 await를 직접 사용할 수있는 호환성이 없습니다.
+
+```py
+user = await db.query(User).first()
+```
+
+... 대신 다음을 사용합니다.
+
+```py
+user = db.query(User).first()
+```
+
+그런 다음 일반 `def`를 사용하여 `async def` 없이 경로 작업 함수와 종속성을 다음과 같이 선언해야합니다.
+
+```py
+@app.get("/users/{user_id}", response_model=schemas.User)
+def read_user(user_id: int, db: Session = Depends(get_db)):
+    db_user = crud.get_user(db, user_id=user_id)
+    ...
+```
+
+정보
+```
+관계형 데이터베이스에 비동기 적으로 연결해야하는 경우 비동기 SQL (관계형) 데이터베이스를 참조하십시오.
+```
+
+Very Technical Details
+```
+호기심이 많고 깊은 기술 지식이 있다면 비동기 문서에서이 비동기 def와 def가 어떻게 처리되는지에 대한 매우 기술적 인 세부 사항을 확인할 수 있습니다.
+```
 
 ### 전체 코드
 
@@ -819,3 +915,5 @@ def read_items(skip: int = 0, limit: int = 100, db: Session = Depends(get_db)):
     items = crud.get_items(db, skip=skip, limit=limit)
     return items
 ```
+
+## 마이그레이션
